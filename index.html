@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intuition Simulator</title>
+  <style>
+    body { background: #020617; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
+    .container { background: #0f172a; border: 1px solid #1e293b; width: 100%; max-width: 400px; padding: 25px; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+    .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
+    .title { font-size: 1.25rem; font-weight: bold; color: #cbd5e1; }
+    .subtitle { font-size: 0.8rem; color: #64748b; }
+    .balance-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; text-align: right; letter-spacing: 1px; }
+    .balance { color: #34d399; font-size: 1.5rem; font-weight: bold; font-family: monospace; }
+    .price { text-align: center; font-size: 3.5rem; font-weight: bold; font-family: monospace; letter-spacing: -2px; margin-bottom: 5px; }
+    .status { height: 24px; text-align: center; font-size: 0.85rem; font-weight: bold; color: #fbbf24; margin-bottom: 20px; }
+    .win { color: #34d399; background: rgba(52, 211, 153, 0.1); padding: 4px 12px; border-radius: 12px; }
+    .loss { color: #fb7185; background: rgba(251, 113, 133, 0.1); padding: 4px 12px; border-radius: 12px; }
+    .chart { height: 160px; display: flex; align-items: flex-end; gap: 2px; margin-bottom: 30px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
+    .bar { flex: 1; background: #334155; border-radius: 2px 2px 0 0; transition: height 0.3s ease; }
+    .bar.current { background: #fbbf24; }
+    .controls { display: flex; gap: 15px; }
+    button { flex: 1; padding: 16px; border: 1px solid; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: all 0.1s; }
+    button:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
+    button:active { transform: scale(0.95); }
+    .btn-up { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.4); }
+    .btn-down { background: rgba(225, 29, 72, 0.15); color: #fb7185; border-color: rgba(225, 29, 72, 0.4); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <div>
+        <div class="title">Fake Market</div>
+        <div class="subtitle">10s Binary Contracts</div>
+      </div>
+      <div>
+        <div class="balance-label">Balance</div>
+        <div class="balance" id="balance">$1000</div>
+      </div>
+    </div>
+
+    <div class="price" id="price">100.00</div>
+    <div class="status" id="status"></div>
+
+    <div class="chart" id="chart"></div>
+
+    <div class="controls">
+      <button class="btn-up" id="btn-up" onclick="placeBet('UP')">YES (Up)</button>
+      <button class="btn-down" id="btn-down" onclick="placeBet('DOWN')">NO (Down)</button>
+    </div>
+  </div>
+
+  <script>
+    let price = 100.00;
+    let history = Array(30).fill(100);
+    let balance = 1000;
+    let activeBet = null;
+    let entryPrice = null;
+    let timeLeft = 0;
+
+    const priceEl = document.getElementById('price');
+    const balanceEl = document.getElementById('balance');
+    const statusEl = document.getElementById('status');
+    const chartEl = document.getElementById('chart');
+    const btnUp = document.getElementById('btn-up');
+    const btnDown = document.getElementById('btn-down');
+
+    function updateChart() {
+      const min = Math.min(...history) - 2;
+      const max = Math.max(...history) + 2;
+      const range = max - min;
+      
+      chartEl.innerHTML = history.map((pt, i) => {
+        const height = ((pt - min) / range) * 100;
+        const isCurrent = i === history.length - 1 ? 'current' : '';
+        return `<div class="bar ${isCurrent}" style="height: ${Math.max(2, height)}%"></div>`;
+      }).join('');
+    }
+
+    // Market Volatility Engine
+    setInterval(() => {
+      const vol = (Math.random() - 0.5) * 2.5;
+      price = Number((price + vol).toFixed(2));
+      history.shift();
+      history.push(price);
+      priceEl.innerText = price.toFixed(2);
+      updateChart();
+    }, 1000);
+
+    // Contract Timer
+    setInterval(() => {
+      if (activeBet && timeLeft > 0) {
+        timeLeft--;
+        statusEl.innerText = `${timeLeft}s remaining at ${entryPrice}`;
+        if (timeLeft === 0) resolveBet();
+      }
+    }, 1000);
+
+    function placeBet(direction) {
+      if (activeBet) return;
+      activeBet = direction;
+      entryPrice = price;
+      timeLeft = 10;
+      btnUp.disabled = true;
+      btnDown.disabled = true;
+      statusEl.innerText = `10s remaining at ${entryPrice}`;
+    }
+
+    function resolveBet() {
+      const wonCall = activeBet === 'UP' && price > entryPrice;
+      const wonPut = activeBet === 'DOWN' && price < entryPrice;
+      
+      if (wonCall || wonPut) {
+        balance += 50;
+        statusEl.innerHTML = `<span class="win">+$50 Won</span>`;
+      } else {
+        balance -= 50;
+        statusEl.innerHTML = `<span class="loss">-$50 Lost</span>`;
+      }
+      
+      balanceEl.innerText = '$' + balance;
+      activeBet = null;
+      btnUp.disabled = false;
+      btnDown.disabled = false;
+      
+      setTimeout(() => { if (!activeBet) statusEl.innerText = ''; }, 3000);
+    }
+    
+    updateChart();
+  </script>
+</body>
+</html>
