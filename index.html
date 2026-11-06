@@ -13,12 +13,21 @@
     .balance-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; text-align: right; letter-spacing: 1px; }
     .balance { color: #34d399; font-size: 1.5rem; font-weight: bold; font-family: monospace; }
     .price { text-align: center; font-size: 3.5rem; font-weight: bold; font-family: monospace; letter-spacing: -2px; margin-bottom: 5px; }
-    .status { height: 24px; text-align: center; font-size: 0.85rem; font-weight: bold; color: #fbbf24; margin-bottom: 20px; }
+    
+    .status { height: 24px; text-align: center; font-size: 0.9rem; font-weight: bold; color: #fbbf24; margin-bottom: 20px; font-family: monospace; }
     .win { color: #34d399; background: rgba(52, 211, 153, 0.1); padding: 4px 12px; border-radius: 12px; }
     .loss { color: #fb7185; background: rgba(251, 113, 133, 0.1); padding: 4px 12px; border-radius: 12px; }
-    .chart { height: 160px; display: flex; align-items: flex-end; gap: 2px; margin-bottom: 30px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
+    
+    .chart { height: 160px; display: flex; align-items: flex-end; gap: 2px; margin-bottom: 20px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
     .bar { flex: 1; background: #334155; border-radius: 2px 2px 0 0; transition: height 0.3s ease; }
     .bar.current { background: #fbbf24; }
+    
+    .bet-input-wrapper { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; background: #1e293b; padding: 12px; border-radius: 12px; }
+    .bet-label { color: #94a3b8; font-size: 0.9rem; font-weight: bold; text-transform: uppercase; }
+    .bet-input { background: #0f172a; border: 1px solid #334155; color: #fff; font-size: 1.2rem; font-weight: bold; padding: 8px; width: 100px; border-radius: 8px; text-align: center; font-family: monospace; }
+    .bet-input:focus { outline: none; border-color: #38bdf8; }
+    .bet-input:disabled { opacity: 0.5; }
+
     .controls { display: flex; gap: 15px; }
     button { flex: 1; padding: 16px; border: 1px solid; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: all 0.1s; }
     button:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
@@ -32,8 +41,8 @@
   <div class="container">
     <div class="header">
       <div>
-        <div class="title">Fake Market</div>
-        <div class="subtitle">10s Binary Contracts</div>
+        <div class="title">Kalshi Sim</div>
+        <div class="subtitle">15m Binary Contracts</div>
       </div>
       <div>
         <div class="balance-label">Balance</div>
@@ -46,6 +55,11 @@
 
     <div class="chart" id="chart"></div>
 
+    <div class="bet-input-wrapper">
+      <span class="bet-label">Wager: $</span>
+      <input type="number" class="bet-input" id="bet-amount" value="50" min="1" max="100000" />
+    </div>
+
     <div class="controls">
       <button class="btn-up" id="btn-up" onclick="placeBet('UP')">YES (Up)</button>
       <button class="btn-down" id="btn-down" onclick="placeBet('DOWN')">NO (Down)</button>
@@ -56,20 +70,26 @@
     let price = 100.00;
     let history = Array(30).fill(100);
     let balance = 1000;
+    
     let activeBet = null;
     let entryPrice = null;
     let timeLeft = 0;
+    let currentWager = 0;
+    
+    let momentum = 0; // Creates wave-like swings
 
     const priceEl = document.getElementById('price');
     const balanceEl = document.getElementById('balance');
     const statusEl = document.getElementById('status');
     const chartEl = document.getElementById('chart');
+    const betInput = document.getElementById('bet-amount');
     const btnUp = document.getElementById('btn-up');
     const btnDown = document.getElementById('btn-down');
 
+    // Chart logic
     function updateChart() {
-      const min = Math.min(...history) - 2;
-      const max = Math.max(...history) + 2;
+      const min = Math.min(...history) - 5;
+      const max = Math.max(...history) + 5;
       const range = max - min;
       
       chartEl.innerHTML = history.map((pt, i) => {
@@ -79,33 +99,68 @@
       }).join('');
     }
 
-    // Market Volatility Engine
+    // Crazy Volatility Engine
     setInterval(() => {
-      const vol = (Math.random() - 0.5) * 2.5;
-      price = Number((price + vol).toFixed(2));
+      // Shift momentum randomly to create steep up-trends and crashes
+      momentum += (Math.random() - 0.5) * 4; 
+      
+      // Cap momentum so it doesn't fly off the screen instantly
+      if(momentum > 10) momentum = 10;
+      if(momentum < -10) momentum = -10;
+
+      // Apply baseline volatility + the current momentum
+      const vol = (Math.random() - 0.5) * 5 + momentum;
+      
+      price = Number(Math.max(1, price + vol).toFixed(2));
       history.shift();
       history.push(price);
       priceEl.innerText = price.toFixed(2);
       updateChart();
     }, 1000);
 
+    // Formats seconds into MM:SS
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
     // Contract Timer
     setInterval(() => {
       if (activeBet && timeLeft > 0) {
         timeLeft--;
-        statusEl.innerText = `${timeLeft}s remaining at ${entryPrice}`;
+        statusEl.innerText = `Contract expires in ${formatTime(timeLeft)} | Entry: ${entryPrice}`;
         if (timeLeft === 0) resolveBet();
       }
     }, 1000);
 
     function placeBet(direction) {
       if (activeBet) return;
+      
+      const wager = parseInt(betInput.value);
+      if (isNaN(wager) || wager <= 0) {
+        alert("Please enter a valid bet amount.");
+        return;
+      }
+      if (wager > balance) {
+        alert("Insufficient balance!");
+        return;
+      }
+
+      // Deduct wager immediately
+      currentWager = wager;
+      balance -= currentWager;
+      balanceEl.innerText = '$' + balance;
+
       activeBet = direction;
       entryPrice = price;
-      timeLeft = 10;
+      timeLeft = 900; // 15 minutes (900 seconds)
+      
+      // Lock UI
       btnUp.disabled = true;
       btnDown.disabled = true;
-      statusEl.innerText = `10s remaining at ${entryPrice}`;
+      betInput.disabled = true;
+      statusEl.innerText = `Contract expires in ${formatTime(timeLeft)} | Entry: ${entryPrice}`;
     }
 
     function resolveBet() {
@@ -113,19 +168,22 @@
       const wonPut = activeBet === 'DOWN' && price < entryPrice;
       
       if (wonCall || wonPut) {
-        balance += 50;
-        statusEl.innerHTML = `<span class="win">+$50 Won</span>`;
+        const winnings = currentWager * 2;
+        balance += winnings;
+        statusEl.innerHTML = `<span class="win">+$${winnings} Won</span>`;
       } else {
-        balance -= 50;
-        statusEl.innerHTML = `<span class="loss">-$50 Lost</span>`;
+        statusEl.innerHTML = `<span class="loss">-$${currentWager} Lost</span>`;
       }
       
       balanceEl.innerText = '$' + balance;
+      
+      // Reset State
       activeBet = null;
       btnUp.disabled = false;
       btnDown.disabled = false;
+      betInput.disabled = false;
       
-      setTimeout(() => { if (!activeBet) statusEl.innerText = ''; }, 3000);
+      setTimeout(() => { if (!activeBet) statusEl.innerText = ''; }, 5000);
     }
     
     updateChart();
