@@ -3,30 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Intuition Simulator</title>
+  <title>Kalshi Intuition Sim</title>
   <style>
     body { background: #020617; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
     .container { background: #0f172a; border: 1px solid #1e293b; width: 100%; max-width: 400px; padding: 25px; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+    
     .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
     .title { font-size: 1.25rem; font-weight: bold; color: #cbd5e1; }
     .subtitle { font-size: 0.8rem; color: #64748b; }
     .balance-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; text-align: right; letter-spacing: 1px; }
     .balance { color: #34d399; font-size: 1.5rem; font-weight: bold; font-family: monospace; }
+    
     .price { text-align: center; font-size: 3.5rem; font-weight: bold; font-family: monospace; letter-spacing: -2px; margin-bottom: 5px; }
     
-    .status { height: 24px; text-align: center; font-size: 0.9rem; font-weight: bold; color: #fbbf24; margin-bottom: 20px; font-family: monospace; }
+    .status { height: 24px; text-align: center; font-size: 0.85rem; font-weight: bold; color: #38bdf8; margin-bottom: 20px; font-family: monospace; }
     .win { color: #34d399; background: rgba(52, 211, 153, 0.1); padding: 4px 12px; border-radius: 12px; }
     .loss { color: #fb7185; background: rgba(251, 113, 133, 0.1); padding: 4px 12px; border-radius: 12px; }
     
-    .chart { height: 160px; display: flex; align-items: flex-end; gap: 2px; margin-bottom: 20px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
+    .chart { height: 160px; display: flex; align-items: flex-end; gap: 2px; margin-bottom: 20px; border-bottom: 1px solid #334155; padding-bottom: 5px; position: relative; }
     .bar { flex: 1; background: #334155; border-radius: 2px 2px 0 0; transition: height 0.3s ease; }
     .bar.current { background: #fbbf24; }
     
-    .bet-input-wrapper { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; background: #1e293b; padding: 12px; border-radius: 12px; }
-    .bet-label { color: #94a3b8; font-size: 0.9rem; font-weight: bold; text-transform: uppercase; }
-    .bet-input { background: #0f172a; border: 1px solid #334155; color: #fff; font-size: 1.2rem; font-weight: bold; padding: 8px; width: 100px; border-radius: 8px; text-align: center; font-family: monospace; }
-    .bet-input:focus { outline: none; border-color: #38bdf8; }
-    .bet-input:disabled { opacity: 0.5; }
+    .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+    .input-box { background: #1e293b; padding: 12px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .input-label { color: #94a3b8; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+    .styled-input { background: #0f172a; border: 1px solid #334155; color: #fff; font-size: 1.1rem; font-weight: bold; padding: 8px; width: 90%; border-radius: 8px; text-align: center; font-family: monospace; }
+    .styled-input:focus { outline: none; border-color: #38bdf8; }
+    .styled-input:disabled { opacity: 0.5; }
 
     .controls { display: flex; gap: 15px; }
     button { flex: 1; padding: 16px; border: 1px solid; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: all 0.1s; }
@@ -42,7 +45,7 @@
     <div class="header">
       <div>
         <div class="title">Kalshi Sim</div>
-        <div class="subtitle">15m Binary Contracts</div>
+        <div class="subtitle">15m Target Contracts</div>
       </div>
       <div>
         <div class="balance-label">Balance</div>
@@ -55,14 +58,20 @@
 
     <div class="chart" id="chart"></div>
 
-    <div class="bet-input-wrapper">
-      <span class="bet-label">Wager: $</span>
-      <input type="number" class="bet-input" id="bet-amount" value="50" min="1" max="100000" />
+    <div class="input-grid">
+      <div class="input-box">
+        <span class="input-label">Target Price</span>
+        <input type="number" class="styled-input" id="target-price" value="105.00" step="0.50" />
+      </div>
+      <div class="input-box">
+        <span class="input-label">Wager ($)</span>
+        <input type="number" class="styled-input" id="bet-amount" value="50" min="1" />
+      </div>
     </div>
 
     <div class="controls">
-      <button class="btn-up" id="btn-up" onclick="placeBet('UP')">YES (Up)</button>
-      <button class="btn-down" id="btn-down" onclick="placeBet('DOWN')">NO (Down)</button>
+      <button class="btn-up" id="btn-up" onclick="placeBet('YES')">YES</button>
+      <button class="btn-down" id="btn-down" onclick="placeBet('NO')">NO</button>
     </div>
   </div>
 
@@ -72,21 +81,20 @@
     let balance = 1000;
     
     let activeBet = null;
-    let entryPrice = null;
+    let targetPrice = null;
     let timeLeft = 0;
     let currentWager = 0;
-    
-    let momentum = 0; // Creates wave-like swings
+    let momentum = 0; 
 
     const priceEl = document.getElementById('price');
     const balanceEl = document.getElementById('balance');
     const statusEl = document.getElementById('status');
     const chartEl = document.getElementById('chart');
+    const targetInput = document.getElementById('target-price');
     const betInput = document.getElementById('bet-amount');
     const btnUp = document.getElementById('btn-up');
     const btnDown = document.getElementById('btn-down');
 
-    // Chart logic
     function updateChart() {
       const min = Math.min(...history) - 5;
       const max = Math.max(...history) + 5;
@@ -99,26 +107,21 @@
       }).join('');
     }
 
-    // Crazy Volatility Engine
+    // High Volatility Market Engine
     setInterval(() => {
-      // Shift momentum randomly to create steep up-trends and crashes
       momentum += (Math.random() - 0.5) * 4; 
-      
-      // Cap momentum so it doesn't fly off the screen instantly
       if(momentum > 10) momentum = 10;
       if(momentum < -10) momentum = -10;
 
-      // Apply baseline volatility + the current momentum
       const vol = (Math.random() - 0.5) * 5 + momentum;
-      
       price = Number(Math.max(1, price + vol).toFixed(2));
+      
       history.shift();
       history.push(price);
       priceEl.innerText = price.toFixed(2);
       updateChart();
     }, 1000);
 
-    // Formats seconds into MM:SS
     function formatTime(seconds) {
       const m = Math.floor(seconds / 60);
       const s = seconds % 60;
@@ -129,7 +132,7 @@
     setInterval(() => {
       if (activeBet && timeLeft > 0) {
         timeLeft--;
-        statusEl.innerText = `Contract expires in ${formatTime(timeLeft)} | Entry: ${entryPrice}`;
+        statusEl.innerText = `Goal: ${activeBet} on ${targetPrice.toFixed(2)} | Ends in ${formatTime(timeLeft)}`;
         if (timeLeft === 0) resolveBet();
       }
     }, 1000);
@@ -138,50 +141,48 @@
       if (activeBet) return;
       
       const wager = parseInt(betInput.value);
-      if (isNaN(wager) || wager <= 0) {
-        alert("Please enter a valid bet amount.");
-        return;
-      }
-      if (wager > balance) {
-        alert("Insufficient balance!");
-        return;
-      }
+      const target = parseFloat(targetInput.value);
 
-      // Deduct wager immediately
+      if (isNaN(wager) || wager <= 0) { alert("Invalid wager."); return; }
+      if (isNaN(target)) { alert("Invalid target price."); return; }
+      if (wager > balance) { alert("Insufficient balance."); return; }
+
       currentWager = wager;
+      targetPrice = target;
       balance -= currentWager;
       balanceEl.innerText = '$' + balance;
 
       activeBet = direction;
-      entryPrice = price;
-      timeLeft = 900; // 15 minutes (900 seconds)
+      timeLeft = 900; // 15m contract
       
-      // Lock UI
       btnUp.disabled = true;
       btnDown.disabled = true;
       betInput.disabled = true;
-      statusEl.innerText = `Contract expires in ${formatTime(timeLeft)} | Entry: ${entryPrice}`;
+      targetInput.disabled = true;
+      
+      statusEl.innerText = `Goal: ${activeBet} on ${targetPrice.toFixed(2)} | Ends in ${formatTime(timeLeft)}`;
     }
 
     function resolveBet() {
-      const wonCall = activeBet === 'UP' && price > entryPrice;
-      const wonPut = activeBet === 'DOWN' && price < entryPrice;
+      // Kalshi logic: YES wins if final price is >= target. NO wins if final price is < target.
+      const wonYes = activeBet === 'YES' && price >= targetPrice;
+      const wonNo = activeBet === 'NO' && price < targetPrice;
       
-      if (wonCall || wonPut) {
+      if (wonYes || wonNo) {
         const winnings = currentWager * 2;
         balance += winnings;
-        statusEl.innerHTML = `<span class="win">+$${winnings} Won</span>`;
+        statusEl.innerHTML = `<span class="win">Target Hit! +$${winnings}</span>`;
       } else {
-        statusEl.innerHTML = `<span class="loss">-$${currentWager} Lost</span>`;
+        statusEl.innerHTML = `<span class="loss">Target Missed! -$${currentWager}</span>`;
       }
       
       balanceEl.innerText = '$' + balance;
       
-      // Reset State
       activeBet = null;
       btnUp.disabled = false;
       btnDown.disabled = false;
       betInput.disabled = false;
+      targetInput.disabled = false;
       
       setTimeout(() => { if (!activeBet) statusEl.innerText = ''; }, 5000);
     }
