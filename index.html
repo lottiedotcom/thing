@@ -8,7 +8,7 @@
     body { background: #020617; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
     .container { background: #0f172a; border: 1px solid #1e293b; width: 100%; max-width: 400px; padding: 25px; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
     
-    .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
+    .header { display: flex; justify-content: space-between; margin-bottom: 25px; }
     .title { font-size: 1.25rem; font-weight: bold; color: #cbd5e1; }
     .subtitle { font-size: 0.8rem; color: #64748b; }
     .balance-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; text-align: right; letter-spacing: 1px; }
@@ -16,12 +16,12 @@
     
     .price { text-align: center; font-size: 3.5rem; font-weight: bold; font-family: monospace; letter-spacing: -2px; margin-bottom: 5px; }
     
-    .status { height: 24px; text-align: center; font-size: 0.85rem; font-weight: bold; color: #38bdf8; margin-bottom: 20px; font-family: monospace; }
+    .status { height: 24px; text-align: center; font-size: 0.85rem; font-weight: bold; color: #38bdf8; margin-bottom: 15px; font-family: monospace; }
     .win { color: #34d399; background: rgba(52, 211, 153, 0.1); padding: 4px 12px; border-radius: 12px; }
     .loss { color: #fb7185; background: rgba(251, 113, 133, 0.1); padding: 4px 12px; border-radius: 12px; }
     
-    .chart { height: 160px; display: flex; align-items: flex-end; gap: 2px; margin-bottom: 20px; border-bottom: 1px solid #334155; padding-bottom: 5px; position: relative; }
-    .bar { flex: 1; background: #334155; border-radius: 2px 2px 0 0; transition: height 0.3s ease; }
+    .chart { height: 160px; display: flex; align-items: flex-end; gap: 1px; margin-bottom: 20px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
+    .bar { flex: 1; background: #334155; border-radius: 1px 1px 0 0; transition: height 0.1s linear; }
     .bar.current { background: #fbbf24; }
     
     .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
@@ -77,14 +77,19 @@
 
   <script>
     let price = 100.00;
-    let history = Array(30).fill(100);
+    // Increased chart width to 60 bars to see patterns better
+    let history = Array(60).fill(100); 
     let balance = 1000;
     
     let activeBet = null;
     let targetPrice = null;
     let timeLeft = 0;
     let currentWager = 0;
-    let momentum = 0; 
+
+    // Advanced Market Engine Variables
+    let marketPhase = 'RANGING';
+    let phaseTicks = 0;
+    let momentum = 0;
 
     const priceEl = document.getElementById('price');
     const balanceEl = document.getElementById('balance');
@@ -96,8 +101,9 @@
     const btnDown = document.getElementById('btn-down');
 
     function updateChart() {
-      const min = Math.min(...history) - 5;
-      const max = Math.max(...history) + 5;
+      // Auto-scale the chart based on the highs and lows of the history
+      const min = Math.min(...history) - 2;
+      const max = Math.max(...history) + 2;
       const range = max - min;
       
       chartEl.innerHTML = history.map((pt, i) => {
@@ -107,20 +113,40 @@
       }).join('');
     }
 
-    // High Volatility Market Engine
+    // High-Frequency Market Engine (Updates every 500ms)
     setInterval(() => {
-      momentum += (Math.random() - 0.5) * 4; 
-      if(momentum > 10) momentum = 10;
-      if(momentum < -10) momentum = -10;
-
-      const vol = (Math.random() - 0.5) * 5 + momentum;
-      price = Number(Math.max(1, price + vol).toFixed(2));
+      phaseTicks++;
+      
+      // Shift market behavior every 30 to 60 ticks (15 to 30 seconds)
+      if (phaseTicks > 30 + Math.random() * 30) {
+        const phases = ['RANGING', 'BULL', 'BEAR', 'CHOPPY'];
+        marketPhase = phases[Math.floor(Math.random() * phases.length)];
+        phaseTicks = 0;
+      }
+      
+      const noise = (Math.random() - 0.5); // Random jitter
+      let change = 0;
+      
+      // Apply logic based on the hidden market phase
+      if (marketPhase === 'RANGING') {
+        change = noise * 1.5; 
+      } else if (marketPhase === 'BULL') {
+        change = noise * 1.8 + 0.3; // Upward bias
+      } else if (marketPhase === 'BEAR') {
+        change = noise * 1.8 - 0.3; // Downward bias
+      } else if (marketPhase === 'CHOPPY') {
+        change = noise * 5.0; // Violent swings
+      }
+      
+      // Smoothing out the spikes so it looks like a real line chart
+      momentum = momentum * 0.7 + change * 0.3;
+      price = Number(Math.max(1, price + change + momentum).toFixed(2));
       
       history.shift();
       history.push(price);
       priceEl.innerText = price.toFixed(2);
       updateChart();
-    }, 1000);
+    }, 500); // 500ms for a live, fast-moving feel
 
     function formatTime(seconds) {
       const m = Math.floor(seconds / 60);
@@ -128,7 +154,7 @@
       return `${m}:${s < 10 ? '0' : ''}${s}`;
     }
 
-    // Contract Timer
+    // 1-Second Countdown Timer for Contracts
     setInterval(() => {
       if (activeBet && timeLeft > 0) {
         timeLeft--;
@@ -153,7 +179,7 @@
       balanceEl.innerText = '$' + balance;
 
       activeBet = direction;
-      timeLeft = 900; // 15m contract
+      timeLeft = 900; // 15m contract (900 seconds)
       
       btnUp.disabled = true;
       btnDown.disabled = true;
@@ -164,7 +190,6 @@
     }
 
     function resolveBet() {
-      // Kalshi logic: YES wins if final price is >= target. NO wins if final price is < target.
       const wonYes = activeBet === 'YES' && price >= targetPrice;
       const wonNo = activeBet === 'NO' && price < targetPrice;
       
